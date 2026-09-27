@@ -1,3 +1,9 @@
+console.log("HZR AUTO REPLY VERSION 2026-09-27-TEST-01");
+
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
