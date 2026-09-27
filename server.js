@@ -40,12 +40,12 @@ app.get("/api/status", (req, res) => {
 });
 
 // ================================
-// SEND WHATSAPP MESSAGE
+// SEND MESSAGE
 // ================================
 
-async function sendTextMessage(to, text) {
+async function sendTextMessage(to, messageText) {
 
-    if (!to || !text) {
+    if (!to || !messageText) {
         console.error("SEND FAILED: Missing to or body.");
         return false;
     }
@@ -53,7 +53,7 @@ async function sendTextMessage(to, text) {
     console.log("---------------------------------");
     console.log("WASENDER SEND REQUEST");
     console.log("To:", to);
-    console.log("Body:", text);
+    console.log("Body:", messageText);
 
     try {
 
@@ -70,7 +70,7 @@ async function sendTextMessage(to, text) {
 
                 body: JSON.stringify({
                     to: to,
-                    body: text
+                    body: messageText
                 })
             }
         );
@@ -119,9 +119,6 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             ? data.messages
             : [];
 
-        // Ignore status webhooks
-        // and other events without messages.
-
         if (messages.length === 0) {
 
             console.log("No messages in webhook.");
@@ -132,19 +129,15 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             });
         }
 
-        // Process messages
-
         for (const message of messages) {
 
-            // Only text messages
-
+            // فقط پیام متنی
             if (message.type !== "text") {
                 console.log("Ignoring non-text message.");
                 continue;
             }
 
-            // Ignore messages sent by the bot itself
-
+            // پیام‌های خود ربات
             if (message.from_me === true) {
                 console.log("Ignoring own message.");
                 continue;
@@ -170,7 +163,7 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             console.log("Message ID:", message.id);
 
             // ================================
-            // SALAM AUTO REPLY
+            // SALAM
             // ================================
 
             if (text === "سلام") {
@@ -199,9 +192,7 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
             } else {
 
-                console.log(
-                    "No automatic reply."
-                );
+                console.log("No automatic reply.");
             }
         }
 
