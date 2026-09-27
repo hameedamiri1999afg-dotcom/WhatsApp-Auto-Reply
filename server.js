@@ -7,17 +7,26 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const WASENDER_TOKEN = process.env.WASENDER_TOKEN;
 
+const WASENDER_API = "https://api.wasender.dev";
+
 if (!WASENDER_TOKEN) {
-    console.error("ERROR: WASENDER_TOKEN is missing.");
+    console.error("=================================");
+    console.error("ERROR: WASENDER_TOKEN IS MISSING");
+    console.error("=================================");
     process.exit(1);
 }
 
 app.use(cors());
-app.use(express.json({ limit: "100kb" }));
 
-// ================================
+app.use(
+    express.json({
+        limit: "100kb"
+    })
+);
+
+// =========================================
 // HOME
-// ================================
+// =========================================
 
 app.get("/", (req, res) => {
     res.json({
@@ -27,9 +36,9 @@ app.get("/", (req, res) => {
     });
 });
 
-// ================================
+// =========================================
 // STATUS
-// ================================
+// =========================================
 
 app.get("/api/status", (req, res) => {
     res.json({
@@ -39,26 +48,43 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-// ================================
-// SEND MESSAGE
-// ================================
+// =========================================
+// SEND WHATSAPP MESSAGE
+// =========================================
 
-async function sendTextMessage(to, messageText) {
+async function sendTextMessage(chatId, messageText) {
 
-    if (!to || !messageText) {
-        console.error("SEND FAILED: Missing to or body.");
+    if (!chatId) {
+        console.error("SEND FAILED: chatId is missing.");
         return false;
     }
 
+    if (!messageText) {
+        console.error("SEND FAILED: messageText is missing.");
+        return false;
+    }
+
+    const cleanChatId = String(chatId).trim();
+    const cleanText = String(messageText);
+
+    const payload = {
+        to: cleanChatId,
+        body: cleanText
+    };
+
+    console.log("");
     console.log("---------------------------------");
     console.log("WASENDER SEND REQUEST");
-    console.log("To:", to);
-    console.log("Body:", messageText);
+    console.log("---------------------------------");
+
+    console.log("To:", cleanChatId);
+    console.log("Text:", cleanText);
+    console.log("Payload:", JSON.stringify(payload));
 
     try {
 
         const response = await fetch(
-            "https://api.wasender.dev/messages/text",
+            `${WASENDER_API}/messages/text`,
             {
                 method: "POST",
 
@@ -68,10 +94,7 @@ async function sendTextMessage(to, messageText) {
                     "Accept": "application/json"
                 },
 
-                body: JSON.stringify({
-                    to: to,
-                    body: messageText
-                })
+                body: JSON.stringify(payload)
             }
         );
 
@@ -81,28 +104,35 @@ async function sendTextMessage(to, messageText) {
         console.log("SEND RESPONSE:", responseText);
 
         if (response.ok) {
+
+            console.log("=================================");
             console.log("MESSAGE SENT SUCCESSFULLY");
-            console.log("---------------------------------");
+            console.log("=================================");
+
             return true;
         }
 
+        console.error("=================================");
         console.error("MESSAGE SEND FAILED");
-        console.log("---------------------------------");
+        console.error("=================================");
 
         return false;
 
     } catch (error) {
 
-        console.error("SEND REQUEST ERROR:", error);
-        console.log("---------------------------------");
+        console.error("=================================");
+        console.error("SEND REQUEST ERROR");
+        console.error("=================================");
+
+        console.error(error);
 
         return false;
     }
 }
 
-// ================================
+// =========================================
 // WHATSAPP WEBHOOK
-// ================================
+// =========================================
 
 app.post("/api/whatsapp/webhook", async (req, res) => {
 
@@ -115,10 +145,18 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
         const data = req.body || {};
 
+        console.log(
+            "Event:",
+            data.event
+                ? JSON.stringify(data.event)
+                : "undefined"
+        );
+
         const messages = Array.isArray(data.messages)
             ? data.messages
             : [];
 
+        // Status events and other webhooks
         if (messages.length === 0) {
 
             console.log("No messages in webhook.");
@@ -129,70 +167,96 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             });
         }
 
+        // Process messages
         for (const message of messages) {
 
-            // فقط پیام متنی
+            console.log("");
+            console.log("MESSAGE RECEIVED");
+
+            console.log(
+                "Type:",
+                message.type
+            );
+
+            // Only text messages
             if (message.type !== "text") {
-                console.log("Ignoring non-text message.");
+
+                console.log(
+                    "Ignored: message is not text."
+                );
+
                 continue;
             }
 
-            // پیام‌های خود ربات
+            // Don't reply to messages sent by the bot/account itself
             if (message.from_me === true) {
-                console.log("Ignoring own message.");
+
+                console.log(
+                    "Ignored: message was sent by this WhatsApp account."
+                );
+
                 continue;
             }
+
+            const chatId =
+                message.chat_id || "";
+
+            const senderPhone =
+                message.phone || "";
 
             const originalText =
                 message.text?.body || "";
 
-            const text =
+            const messageId =
+                message.id || "";
+
+            const normalizedText =
                 String(originalText)
                     .trim()
                     .toLowerCase();
 
-            const chatId =
-                message.chat_id;
-
-            console.log("");
-            console.log("MESSAGE RECEIVED");
             console.log("Chat:", chatId);
-            console.log("From:", message.phone);
-            console.log("Name:", message.from_name);
+            console.log("From:", senderPhone);
             console.log("Text:", originalText);
-            console.log("Message ID:", message.id);
+            console.log("Normalized:", normalizedText);
+            console.log("Message ID:", messageId);
 
-            // ================================
-            // SALAM
-            // ================================
+            // chat_id is required for replying
+            if (!chatId) {
 
-            if (text === "سلام") {
+                console.error(
+                    "Ignored: chat_id is missing."
+                );
 
+                continue;
+            }
+
+            // =========================================
+            // SALAM AUTO REPLY
+            // =========================================
+
+            if (normalizedText === "سلام") {
+
+                console.log("");
                 console.log("SALAM DETECTED");
-                console.log("Sending: ع سلام");
 
-                const sent =
-                    await sendTextMessage(
-                        chatId,
-                        "ع سلام"
-                    );
+                const replyText = "ع سلام";
 
-                if (sent) {
+                console.log(
+                    "Reply:",
+                    replyText
+                );
 
-                    console.log(
-                        "AUTO REPLY SENT SUCCESSFULLY"
-                    );
-
-                } else {
-
-                    console.log(
-                        "AUTO REPLY FAILED"
-                    );
-                }
+                await sendTextMessage(
+                    chatId,
+                    replyText
+                );
 
             } else {
 
-                console.log("No automatic reply.");
+                console.log(
+                    "No automatic reply."
+                );
             }
         }
 
@@ -203,10 +267,12 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
     } catch (error) {
 
-        console.error(
-            "WEBHOOK ERROR:",
-            error
-        );
+        console.error("");
+        console.error("=================================");
+        console.error("WEBHOOK ERROR");
+        console.error("=================================");
+
+        console.error(error);
 
         return res.status(500).json({
             success: false,
@@ -215,9 +281,9 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
     }
 });
 
-// ================================
+// =========================================
 // 404
-// ================================
+// =========================================
 
 app.use((req, res) => {
 
@@ -225,19 +291,19 @@ app.use((req, res) => {
         success: false,
         error: "Not Found"
     });
-
 });
 
-// ================================
+// =========================================
 // START SERVER
-// ================================
+// =========================================
 
 app.listen(PORT, () => {
 
     console.log("=================================");
     console.log("WHATSAPP AUTO REPLY");
     console.log(`Server running on port ${PORT}`);
-    console.log("Webhook: /api/whatsapp/webhook");
+    console.log(
+        "Webhook: /api/whatsapp/webhook"
+    );
     console.log("=================================");
-
 });
