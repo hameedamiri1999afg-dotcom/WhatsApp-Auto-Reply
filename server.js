@@ -15,10 +15,6 @@ if (!WASENDER_TOKEN) {
 app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 
-// =====================================
-// HOME
-// =====================================
-
 app.get("/", (req, res) => {
     res.json({
         success: true,
@@ -26,10 +22,6 @@ app.get("/", (req, res) => {
         status: "online"
     });
 });
-
-// =====================================
-// STATUS
-// =====================================
 
 app.get("/api/status", (req, res) => {
     res.json({
@@ -39,79 +31,49 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-// =====================================
-// SEND TEXT MESSAGE
-// =====================================
-
 async function sendTextMessage(to, text) {
-
     if (!to || !text) {
         console.error("SEND FAILED: Missing to or text.");
         return false;
     }
 
-    const url = "https://api.wasender.dev/messages/text";
-
-    console.log("---------------------------------");
-    console.log("WASENDER SEND REQUEST");
-    console.log("To:", to);
-    console.log("Text:", text);
-
     try {
-
-        const response = await fetch(url, {
-            method: "POST",
-
-            headers: {
-                "Authorization": `Bearer ${WASENDER_TOKEN}`,
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-
-            body: JSON.stringify({
-                to: to,
-                text: text
-            })
-        });
+        const response = await fetch(
+            "https://api.wasender.dev/messages/text",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${WASENDER_TOKEN}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                    to: to,
+                    text: text
+                })
+            }
+        );
 
         const responseText = await response.text();
 
         console.log("SEND STATUS:", response.status);
         console.log("SEND RESPONSE:", responseText);
 
-        if (response.ok) {
-            console.log("MESSAGE SENT SUCCESSFULLY");
-            console.log("---------------------------------");
-            return true;
-        }
-
-        console.error("MESSAGE SEND FAILED");
-        console.log("---------------------------------");
-
-        return false;
+        return response.ok;
 
     } catch (error) {
-
         console.error("SEND REQUEST ERROR:", error);
-        console.log("---------------------------------");
-
         return false;
     }
 }
 
-// =====================================
-// WHATSAPP WEBHOOK
-// =====================================
-
 app.post("/api/whatsapp/webhook", async (req, res) => {
-
     console.log("");
     console.log("=================================");
     console.log("WHATSAPP AUTO REPLY - WEBHOOK");
     console.log("=================================");
 
     try {
-
         const data = req.body || {};
 
         const messages = Array.isArray(data.messages)
@@ -119,7 +81,6 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             : [];
 
         if (messages.length === 0) {
-
             console.log("No messages in webhook.");
 
             return res.status(200).json({
@@ -130,10 +91,12 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
         for (const message of messages) {
 
+            // فقط پیام‌های متنی
             if (message.type !== "text") {
                 continue;
             }
 
+            // پیام‌های خود ربات را نادیده بگیر
             if (message.from_me === true) {
                 continue;
             }
@@ -152,21 +115,26 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
             console.log("MESSAGE RECEIVED");
             console.log("Chat:", chatId);
             console.log("From:", message.phone);
+            console.log("Name:", message.from_name);
             console.log("Text:", originalText);
             console.log("Message ID:", message.id);
 
-            // =================================
-            // SALAM
-            // =================================
-
+            // پاسخ به «سلام»
             if (text === "سلام") {
 
                 console.log("SALAM DETECTED");
+                console.log("Sending: ع سلام");
 
-                await sendTextMessage(
+                const sent = await sendTextMessage(
                     chatId,
                     "ع سلام"
                 );
+
+                if (sent) {
+                    console.log("AUTO REPLY SENT SUCCESSFULLY");
+                } else {
+                    console.log("AUTO REPLY FAILED");
+                }
 
             } else {
 
@@ -181,10 +149,7 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
     } catch (error) {
 
-        console.error(
-            "WEBHOOK ERROR:",
-            error
-        );
+        console.error("WEBHOOK ERROR:", error);
 
         return res.status(500).json({
             success: false,
@@ -193,29 +158,17 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
     }
 });
 
-// =====================================
-// 404
-// =====================================
-
 app.use((req, res) => {
-
     res.status(404).json({
         success: false,
         error: "Not Found"
     });
 });
 
-// =====================================
-// START
-// =====================================
-
 app.listen(PORT, () => {
-
     console.log("=================================");
     console.log("WHATSAPP AUTO REPLY");
     console.log(`Server running on port ${PORT}`);
-    console.log(
-        "Webhook: /api/whatsapp/webhook"
-    );
+    console.log("Webhook: /api/whatsapp/webhook");
     console.log("=================================");
 });
